@@ -47,28 +47,66 @@ const ContractCreate: React.FC = () => {
     try {
       setLoading(true)
       setError(null)
-      console.log('开始加载用户列表...')
+      console.log('=== 开始加载用户列表 ===')
+      console.log('当前token:', localStorage.getItem('token'))
+      console.log('API请求URL:', '/api/contracts/users')
+      console.log('当前users状态:', users)
       
       // 添加超时控制
       const timeoutPromise = new Promise((_, reject) => {
         setTimeout(() => reject(new Error('请求超时')), 10000)
       })
       
-      const usersData = await Promise.race([
+      console.log('正在发起API请求...')
+      const apiResponse = await Promise.race([
         contractApi.getUsers(),
         timeoutPromise
-      ]) as User[]
+      ])
       
-      console.log('用户列表加载成功:', usersData)
-      setUsers(usersData || [])
+      console.log('=== API响应详情 ===')
+      console.log('原始响应:', apiResponse)
+      console.log('响应类型:', typeof apiResponse)
+      console.log('是否为数组:', Array.isArray(apiResponse))
+      console.log('响应长度:', apiResponse?.length)
+      console.log('响应内容:', JSON.stringify(apiResponse, null, 2))
+      
+      const usersData = apiResponse as User[]
+      console.log('=== 处理后的用户数据 ===')
+      console.log('用户数据:', usersData)
+      console.log('用户数据类型:', typeof usersData)
+      console.log('是否为数组:', Array.isArray(usersData))
+      console.log('数据长度:', usersData?.length)
+      
+      console.log('正在设置users状态...')
+      setUsers(usersData.data || [])
+      console.log('users状态设置完成')
       setRetryCount(0)
     } catch (error) {
-      console.error('加载用户列表失败:', error)
+      console.error('=== 加载用户列表失败 ===')
+      console.error('详细错误:', error)
+      console.error('错误类型:', typeof error)
+      console.error('错误构造函数:', error?.constructor?.name)
+      
+      if (error && typeof error === 'object') {
+        console.error('错误对象keys:', Object.keys(error))
+        if ('response' in error) {
+          const axiosError = error as any
+          console.error('HTTP状态码:', axiosError.response?.status)
+          console.error('响应数据:', axiosError.response?.data)
+          console.error('响应头:', axiosError.response?.headers)
+          console.error('请求配置:', axiosError.config)
+        }
+        if ('message' in error) {
+          console.error('错误消息:', (error as any).message)
+        }
+      }
+      
       const errorMessage = error instanceof Error ? error.message : '加载用户列表失败'
       setError(errorMessage)
       setUsers([]) // 确保在错误情况下users始终是数组
       message.error(errorMessage)
     } finally {
+      console.log('=== loadUsers函数执行完成 ===')
       setLoading(false)
     }
   }
@@ -270,11 +308,19 @@ const ContractCreate: React.FC = () => {
               showSearch
               optionFilterProp="children"
             >
-              {Array.isArray(users) ? users.map(user => (
-                <Option key={user.id} value={user.id}>
-                  {user.realName} ({user.email})
-                </Option>
-              )) : []}
+              {(() => {
+                console.log('渲染负责人下拉列表 - users状态:', users)
+                console.log('users是否为数组:', Array.isArray(users))
+                console.log('users长度:', users?.length)
+                return Array.isArray(users) ? users.map(user => {
+                  console.log('渲染用户选项:', user)
+                  return (
+                    <Option key={user.id} value={user.id}>
+                      {user.realName} ({user.email})
+                    </Option>
+                  )
+                }) : []
+              })()}
             </Select>
           </Form.Item>
           
