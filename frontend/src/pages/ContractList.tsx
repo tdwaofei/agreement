@@ -59,11 +59,11 @@ const ContractList: React.FC = () => {
         ...params,
       })
       
-      setContracts(response.data.content)
+      setContracts(response.content)
       setPagination({
-        current: response.data.number + 1,
-        pageSize: response.data.size,
-        total: response.data.totalElements
+        current: (response.number || 0) + 1,
+        pageSize: response.size || 10,
+        total: response.totalElements || 0
       })
     } catch (error) {
       console.error('加载合同列表失败:', error)

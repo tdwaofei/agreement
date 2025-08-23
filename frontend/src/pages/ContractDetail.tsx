@@ -65,20 +65,20 @@ const ContractDetail: React.FC = () => {
         contractApi.getContractById(contractId),
         contractApi.getUsers()
       ])
-      setContract(contractResponse.data)
-      setUsers(usersResponse.data)
+      setContract(contractResponse)
+      setUsers(usersResponse)
       
       // 如果是编辑模式，设置表单值
       if (isEditMode || editing) {
         form.setFieldsValue({
-          contractName: contractResponse.data.contractName,
-          contractType: contractResponse.data.contractType,
-          contractNumber: contractResponse.data.contractNumber,
-          responsibleUserId: contractResponse.data.responsibleUserId,
-          startDate: dayjs(contractResponse.data.startDate),
-          endDate: dayjs(contractResponse.data.endDate),
-          status: contractResponse.data.status,
-          description: contractResponse.data.description,
+          contractName: contractResponse.contractName,
+          contractType: contractResponse.contractType,
+          contractNumber: contractResponse.contractNumber,
+          responsibleUserId: contractResponse.responsibleUserId,
+          startDate: dayjs(contractResponse.startDate),
+          endDate: dayjs(contractResponse.endDate),
+          status: contractResponse.status,
+          description: contractResponse.description,
         })
       }
     } catch (error) {
@@ -152,7 +152,7 @@ const ContractDetail: React.FC = () => {
       }
       
       const updatedContract = await contractApi.updateContract(contract.id, updateData)
-      setContract(updatedContract.data)
+      setContract(updatedContract)
       setEditing(false)
       message.success('保存成功')
       

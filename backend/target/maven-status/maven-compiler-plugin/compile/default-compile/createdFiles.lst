@@ -31,4 +31,6 @@ com\company\contract\entity\SystemConfig.class
 com\company\contract\entity\User.class
 com\company\contract\config\JpaConfig.class
 com\company\contract\service\ContractService$ContractStatistics.class
+com\company\contract\util\PasswordHashGenerator.class
+com\company\contract\util\DatabasePasswordUpdater.class
 com\company\contract\util\ApiResponse.class

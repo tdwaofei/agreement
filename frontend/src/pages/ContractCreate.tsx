@@ -11,13 +11,16 @@ import {
   Divider,
   Space,
   Upload,
+  Alert,
+  Spin,
 } from 'antd'
-import { ArrowLeftOutlined, SaveOutlined, ReloadOutlined, UploadOutlined, DeleteOutlined } from '@ant-design/icons'
-import type { UploadFile, UploadProps } from 'antd'
+import { ArrowLeftOutlined, UploadOutlined, DeleteOutlined, SaveOutlined, ReloadOutlined } from '@ant-design/icons'
+import type { UploadFile } from 'antd'
 import { useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
 import * as contractApi from '../services/contract'
 import type { User } from '../services/contract'
+import ErrorBoundary from '../components/ErrorBoundary'
 
 const { Title } = Typography
 const { TextArea } = Input
@@ -34,6 +37,8 @@ const ContractCreate: React.FC = () => {
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [fileList, setFileList] = useState<UploadFile[]>([])
+  const [error, setError] = useState<string | null>(null)
+  const [retryCount, setRetryCount] = useState(0)
 
   /**
    * 加载用户列表
@@ -41,28 +46,58 @@ const ContractCreate: React.FC = () => {
   const loadUsers = async () => {
     try {
       setLoading(true)
-       const usersData = await contractApi.getUsers()
-       setUsers(usersData.data)
+      setError(null)
+      console.log('开始加载用户列表...')
+      
+      // 添加超时控制
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('请求超时')), 10000)
+      })
+      
+      const usersData = await Promise.race([
+        contractApi.getUsers(),
+        timeoutPromise
+      ]) as User[]
+      
+      console.log('用户列表加载成功:', usersData)
+      setUsers(usersData || [])
+      setRetryCount(0)
     } catch (error) {
       console.error('加载用户列表失败:', error)
-      message.error('加载用户列表失败')
+      const errorMessage = error instanceof Error ? error.message : '加载用户列表失败'
+      setError(errorMessage)
+      setUsers([]) // 确保在错误情况下users始终是数组
+      message.error(errorMessage)
     } finally {
       setLoading(false)
     }
   }
 
   /**
+   * 重试加载用户列表
+   */
+  const handleRetry = () => {
+    setRetryCount(prev => prev + 1)
+    loadUsers()
+  }
+
+  /**
    * 初始化页面数据
    */
   useEffect(() => {
-    loadUsers()
-    
-    // 设置默认值
-    form.setFieldsValue({
-      contractType: '服务合同',
-      startDate: dayjs(),
-      endDate: dayjs().add(1, 'year'),
-    })
+    try {
+      loadUsers()
+      
+      // 设置默认值
+      form.setFieldsValue({
+        contractType: '服务合同',
+        startDate: dayjs(),
+        endDate: dayjs().add(1, 'year'),
+      })
+    } catch (error) {
+      console.error('初始化页面数据失败:', error)
+      setError('页面初始化失败')
+    }
   }, [])
 
   /**
@@ -97,7 +132,7 @@ const ContractCreate: React.FC = () => {
           })
           
           // 上传文件到合同
-          await contractApi.uploadContractFiles(newContract.data.id, formData)
+          await contractApi.uploadContractFiles(newContract.id, formData)
           message.success('合同创建成功，文件上传完成')
         } catch (fileError) {
           console.error('文件上传失败:', fileError)
@@ -107,7 +142,7 @@ const ContractCreate: React.FC = () => {
         message.success('合同创建成功')
       }
       
-      navigate(`/contracts/${newContract.data.id}`)
+      navigate(`/contracts/${newContract.id}`)
     } catch (error) {
       console.error('创建合同失败:', error)
       message.error('创建失败')
@@ -129,27 +164,63 @@ const ContractCreate: React.FC = () => {
     setFileList([]) // 清空文件列表
   }
 
+  // 如果正在加载且没有用户数据，显示加载状态
+  if (loading && users.length === 0) {
+    return (
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        height: '50vh',
+        flexDirection: 'column',
+        gap: '16px'
+      }}>
+        <Spin size="large" />
+        <div>正在加载页面数据...</div>
+      </div>
+    )
+  }
+
   return (
-    <div>
-      {/* 页面标题 */}
-      <div className="page-header">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <Button
-              icon={<ArrowLeftOutlined />}
-              onClick={() => navigate('/contracts')}
-              style={{ marginRight: 16 }}
-            >
-              返回列表
-            </Button>
-            <Title level={3} style={{ display: 'inline', margin: 0 }}>
-              新增合同
-            </Title>
+    <ErrorBoundary>
+      <div>
+        {/* 错误提示 */}
+        {error && (
+          <Alert
+            message="加载失败"
+            description={`${error}${retryCount > 0 ? ` (重试次数: ${retryCount})` : ''}`}
+            type="error"
+            showIcon
+            closable
+            onClose={() => setError(null)}
+            action={
+              <Button size="small" onClick={handleRetry}>
+                重试
+              </Button>
+            }
+            style={{ marginBottom: 16 }}
+          />
+        )}        
+        
+        {/* 页面标题 */}
+        <div className="page-header">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <Button
+                icon={<ArrowLeftOutlined />}
+                onClick={() => navigate('/contracts')}
+                style={{ marginRight: 16 }}
+              >
+                返回列表
+              </Button>
+              <Title level={3} style={{ display: 'inline', margin: 0 }}>
+                新增合同
+              </Title>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* 创建表单 */}
+        {/* 创建表单 */}
       <Card>
         <Form
           form={form}
@@ -199,11 +270,11 @@ const ContractCreate: React.FC = () => {
               showSearch
               optionFilterProp="children"
             >
-              {users.map(user => (
+              {Array.isArray(users) ? users.map(user => (
                 <Option key={user.id} value={user.id}>
                   {user.realName} ({user.email})
                 </Option>
-              ))}
+              )) : []}
             </Select>
           </Form.Item>
           
@@ -330,7 +401,8 @@ const ContractCreate: React.FC = () => {
           </Form.Item>
         </Form>
       </Card>
-    </div>
+      </div>
+    </ErrorBoundary>
   )
 }
 

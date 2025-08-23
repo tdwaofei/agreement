@@ -116,56 +116,56 @@ export const contractApi = {
       }
     })
     
-    return api.get<PageResponse<Contract>>(`/api/contracts?${queryParams.toString()}`)
+    return api.get<PageResponse<Contract>>(`/contracts?${queryParams.toString()}`)
   },
 
   /**
    * 根据ID获取合同详情
    */
   getContractById: (id: number) => 
-    api.get<Contract>(`/api/contracts/${id}`),
+    api.get<Contract>(`/contracts/${id}`),
 
   /**
    * 创建新合同
    */
   createContract: (data: ContractCreateRequest) => 
-    api.post<Contract>('/api/contracts', data),
+    api.post<Contract>('/contracts', data),
 
   /**
    * 更新合同
    */
   updateContract: (id: number, data: ContractUpdateRequest) => 
-    api.put<Contract>(`/api/contracts/${id}`, data),
+    api.put<Contract>(`/contracts/${id}`, data),
 
   /**
    * 删除合同
    */
   deleteContract: (id: number) => 
-    api.delete<string>(`/api/contracts/${id}`),
+    api.delete<string>(`/contracts/${id}`),
 
   /**
    * 获取合同统计信息
    */
   getContractStatistics: () => 
-    api.get<ContractStatistics>('/api/contracts/statistics'),
+    api.get<ContractStatistics>('/contracts/statistics'),
 
   /**
    * 获取即将到期的合同
    */
   getExpiringContracts: (days: number = 30) => 
-    api.get<Contract[]>(`/api/contracts/expiring?days=${days}`),
+    api.get<Contract[]>(`/contracts/expiring?days=${days}`),
 
   /**
    * 获取用户列表（用于选择负责人）
    */
   getUsers: () => 
-    api.get<User[]>('/api/users'),
+    api.get<User[]>('/contracts/users'),
 
   /**
    * 上传合同文件
    */
   uploadContractFiles: (contractId: number, formData: FormData) => 
-    api.post<any>(`/api/files/batch-upload/${contractId}`, formData, {
+    api.post<any>(`/files/batch-upload/${contractId}`, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
@@ -175,13 +175,13 @@ export const contractApi = {
    * 获取合同文件列表
    */
   getContractFiles: (contractId: number) => 
-    api.get<any[]>(`/api/files/contract/${contractId}`),
+    api.get<any[]>(`/files/contract/${contractId}`),
 
   /**
    * 删除合同文件
    */
-  deleteContractFile: (contractId: number, fileId: number) => 
-    api.delete<string>(`/api/files/${fileId}`)
+  deleteContractFile: (_contractId: number, fileId: number) => 
+    api.delete<string>(`/files/${fileId}`)
 };
 
 // 兼容性导出
