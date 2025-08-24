@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useEffect, useState, useRef, useCallback } from 'react'
 import {
   Table,
   Card,
@@ -16,15 +16,45 @@ import {
 } from 'antd'
 import {
   SearchOutlined,
+  ReloadOutlined,
   PlusOutlined,
+  EyeOutlined,
   EditOutlined,
   DeleteOutlined,
-  EyeOutlined,
-  ReloadOutlined,
 } from '@ant-design/icons'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom'
+import { contractApi } from '../services/contract'
+// 定义合同状态枚举
+export enum ContractStatus {
+  ACTIVE = 'ACTIVE',
+  EXPIRED = 'EXPIRED',
+  TERMINATED = 'TERMINATED'
+}
+
+// 定义合同查询参数接口
+export interface ContractQueryParams {
+  contractName?: string;
+  contractType?: string;
+  status?: ContractStatus;
+  page?: number;
+  size?: number;
+}
+
+// 定义合同接口
+export interface Contract {
+  id: number;
+  contractName: string;
+  contractNumber: string;
+  contractType: string;
+  responsibleUser: {
+    realName: string;
+  };
+  startDate: string;
+  endDate: string;
+  status: ContractStatus;
+  createdAt: string;
+}
 import { useAuth } from '../contexts/AuthContext'
-import { contractApi, Contract, ContractQueryParams, ContractStatus } from '../services/contract';
 
 const { Title } = Typography
 const { Option } = Select
@@ -44,58 +74,281 @@ const ContractList: React.FC = () => {
   })
   const { } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
   const [searchParams, setSearchParams] = useSearchParams()
 
   /**
    * 加载合同列表
    * @param params 查询参数
    */
-  const loadContracts = async (params: ContractQueryParams = {}) => {
+  const loadContracts = useCallback(async (params: ContractQueryParams = {}) => {
     try {
       setLoading(true)
-      const response = await contractApi.getContracts({
-        page: pagination.current - 1,
-        size: pagination.pageSize,
+      console.log('=== 开始加载合同列表 ===')
+      console.log('📋 [LOAD] 调用来源:', new Error().stack?.split('\n')[2]?.trim())
+      
+      // 分页参数处理：传入的参数优先，否则使用默认值
+      const requestPage = params.page !== undefined ? params.page : 0 // 默认第一页
+      const requestSize = params.size !== undefined ? params.size : 10 // 默认每页10条
+      
+      console.log('📋 [LOAD] 分页参数处理结果:')
+      console.log('  - 传入的params:', params)
+      console.log('  - 计算后的requestPage:', requestPage)
+      console.log('  - 计算后的requestSize:', requestSize)
+      
+      const requestParams = {
         ...params,
+        page: requestPage,
+        size: requestSize,
+      }
+      
+      console.log('=== 分页参数详情 ===')
+      console.log('当前pagination状态:', pagination)
+      console.log('传入的params:', params)
+      console.log('计算后的page:', requestPage)
+      console.log('计算后的size:', requestSize)
+      console.log('最终请求参数:', requestParams)
+      
+      const response = await contractApi.getContracts(requestParams)
+      
+      console.log('API响应原始数据:', response)
+      console.log('响应数据类型:', typeof response)
+      console.log('是否为对象:', typeof response === 'object')
+      console.log('响应对象keys:', response ? Object.keys(response) : 'null')
+      
+      // 检查响应数据结构，处理可能的Axios响应对象
+      let contractData
+      if (response && typeof response === 'object' && 'data' in response) {
+        console.log('检测到Axios响应对象，提取data属性')
+        contractData = response.data
+      } else {
+        console.log('直接使用响应数据')
+        contractData = response
+      }
+      
+      console.log('处理后的合同数据:', contractData)
+      console.log('合同数据类型:', typeof contractData)
+      console.log('合同数据content:', contractData?.content)
+      console.log('合同数据长度:', contractData?.content?.length)
+      
+      // 更新合同列表数据
+      const contractList = contractData?.content || []
+      console.log('=== 准备更新contracts状态 ===')
+      console.log('提取的合同列表数据:', contractList)
+      console.log('合同列表长度:', contractList.length)
+      console.log('合同列表是否为数组:', Array.isArray(contractList))
+      console.log('合同列表第一项:', contractList[0])
+      // 移除可能导致循环的状态引用调试日志
+      
+      // 使用函数式更新确保状态正确设置
+      setContracts(prevContracts => {
+        console.log('=== setContracts函数式更新 ===')
+        console.log('之前的contracts状态:', prevContracts)
+        console.log('新的contracts数据:', contractList)
+        console.log('新数据长度:', contractList.length)
+        return contractList
       })
       
-      setContracts(response.content)
-      setPagination({
-        current: (response.number || 0) + 1,
-        pageSize: response.size || 10,
-        total: response.totalElements || 0
+      console.log('=== contracts状态更新调用完成 ===')
+      
+      // 更新分页状态
+      const newPagination = {
+        current: (contractData?.number || 0) + 1,
+        pageSize: contractData?.size || 10,
+        total: contractData?.totalElements || 0
+      }
+      
+      setPagination(prevPagination => {
+        console.log('=== setPagination函数式更新 ===')
+        console.log('之前的pagination状态:', prevPagination)
+        console.log('新的pagination状态:', newPagination)
+        return newPagination
       })
+      
+      console.log('=== 分页状态更新详情 ===')
+      console.log('设置的合同列表长度:', contractList.length)
+      console.log('API返回的分页信息:')
+      console.log('  - number (当前页-从0开始):', contractData?.number)
+      console.log('  - size (每页大小):', contractData?.size)
+      console.log('  - totalElements (总记录数):', contractData?.totalElements)
+      console.log('  - totalPages (总页数):', contractData?.totalPages)
+      console.log('=== 合同列表加载完成 ===')
+      
+      // 移除可能导致循环的延迟状态检查
     } catch (error) {
-      console.error('加载合同列表失败:', error)
+      console.error('加载合同列表失败 - 详细错误:', error)
+      console.error('错误类型:', typeof error)
+      if (error && typeof error === 'object' && 'response' in error) {
+        const axiosError = error as any
+        console.error('HTTP状态码:', axiosError.response?.status)
+        console.error('响应数据:', axiosError.response?.data)
+      }
       message.error('加载合同列表失败')
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
+
+  // 添加防抖状态，防止重复调用
+  const [isInitialized, setIsInitialized] = useState(false)
+  const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   /**
-   * 初始化页面数据
+   * 防抖的loadContracts函数
+   * @param params 查询参数
+   * @param delay 延迟时间（毫秒）
+   */
+  const debouncedLoadContracts = useCallback((params: ContractQueryParams = {}, delay: number = 300) => {
+    // 防止在loading状态下重复调用
+    if (loading) {
+      console.log('=== 防抖调用被阻止：正在加载中 ===')
+      return
+    }
+    
+    // 清除之前的定时器
+    if (loadingTimeoutRef.current) {
+      clearTimeout(loadingTimeoutRef.current)
+    }
+    
+    // 设置新的定时器
+    loadingTimeoutRef.current = setTimeout(() => {
+      console.log('=== 防抖调用loadContracts ===', params)
+      loadContracts(params)
+    }, delay)
+  }, [loading, loadContracts])
+
+  // 组件卸载时清理定时器
+  useEffect(() => {
+    return () => {
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current)
+      }
+    }
+  }, [])
+
+  /**
+   * 组件挂载时立即初始化数据
+   * 确保每次进入页面都能自动加载数据
    */
   useEffect(() => {
+    console.log('🚀 [MOUNT] 组件挂载：立即初始化数据加载')
+    console.log('🚀 [MOUNT] 调用栈跟踪:', new Error().stack?.split('\n').slice(0, 3))
+    
     // 从URL参数中恢复搜索条件
     const initialValues = {
       contractName: searchParams.get('contractName') || '',
       contractType: searchParams.get('contractType') || '',
       status: (searchParams.get('status') as ContractStatus) || undefined,
-      page: parseInt(searchParams.get('page') || '1'),
+      page: parseInt(searchParams.get('page') || '1') - 1, // 转换为后端需要的从0开始的页码
       size: parseInt(searchParams.get('size') || '10')
     }
     
-    // setQueryParams(initialValues) // 暂时注释掉，因为没有定义这个状态
-    form.setFieldsValue(initialValues)
+    console.log('🚀 [MOUNT] 初始化参数:', initialValues)
+    console.log('🚀 [MOUNT] 转换后的page参数 (后端格式):', initialValues.page)
+    form.setFieldsValue({
+      ...initialValues,
+      page: initialValues.page + 1 // 表单显示用前端格式（从1开始）
+    })
+    
+    // 立即加载数据，直接传入完整参数，避免依赖状态
+    console.log('🚀 [MOUNT] 直接调用loadContracts - 传入完整分页参数')
     loadContracts(initialValues)
-  }, [])
+    setIsInitialized(true)
+    
+    console.log('🚀 [MOUNT] 组件挂载初始化完成')
+  }, []) // 移除loadContracts依赖项，避免循环
+
+  /**
+   * URL参数变化时更新数据
+   * 处理浏览器前进后退等场景
+   */
+  useEffect(() => {
+    if (isInitialized) {
+      console.log('🔄 [URL] URL参数变化：更新数据')
+      console.log('🔄 [URL] 调用栈跟踪:', new Error().stack?.split('\n').slice(0, 3))
+      
+      const updatedValues = {
+        contractName: searchParams.get('contractName') || '',
+        contractType: searchParams.get('contractType') || '',
+        status: (searchParams.get('status') as ContractStatus) || undefined,
+        page: parseInt(searchParams.get('page') || '1'),
+        size: parseInt(searchParams.get('size') || '10')
+      }
+      
+      console.log('🔄 [URL] 更新的参数:', updatedValues)
+      form.setFieldsValue(updatedValues)
+      // 使用防抖调用避免死循环
+      console.log('🔄 [URL] 使用防抖调用debouncedLoadContracts')
+      debouncedLoadContracts(updatedValues, 200)
+    } else {
+      console.log('🔄 [URL] 跳过：组件未初始化')
+    }
+  }, [searchParams, isInitialized]) // 移除loadContracts依赖项，避免循环
+
+  /**
+   * 页面可见性变化监听
+   * 当页面重新变为可见时自动刷新数据
+   */
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden && isInitialized) {
+        console.log('=== 页面可见性变化：页面变为可见，防抖刷新数据 ===')
+        // 页面变为可见时，刷新合同列表
+        const currentValues = form.getFieldsValue()
+        debouncedLoadContracts(currentValues, 200)
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [isInitialized]) // 移除debouncedLoadContracts依赖项，避免循环
+
+  /**
+   * 路由变化监听
+   * 当路由变化时检查是否需要刷新数据
+   */
+  useEffect(() => {
+    console.log('=== 路由变化监听：当前路径 ===', location.pathname)
+    console.log('=== 初始化状态 ===', isInitialized)
+    
+    // 只有在已初始化且当前在合同列表页面时才刷新数据
+    if (isInitialized && location.pathname === '/contracts') {
+      console.log('=== 路由变化：检测到返回合同列表页面，防抖刷新数据 ===')
+      const currentValues = form.getFieldsValue()
+      console.log('=== 路由变化：当前表单值 ===', currentValues)
+      debouncedLoadContracts(currentValues, 100) // 使用较短的延迟
+    }
+  }, [location.pathname, isInitialized]) // 移除debouncedLoadContracts依赖项，避免循环
+
+  /**
+   * 组件焦点监听
+   * 当组件重新获得焦点时刷新数据
+   */
+  useEffect(() => {
+    const handleFocus = () => {
+      if (isInitialized) {
+        console.log('=== 窗口焦点变化：窗口获得焦点，防抖刷新数据 ===')
+        const currentValues = form.getFieldsValue()
+        debouncedLoadContracts(currentValues, 500) // 焦点变化使用较长延迟
+      }
+    }
+
+    window.addEventListener('focus', handleFocus)
+    
+    return () => {
+      window.removeEventListener('focus', handleFocus)
+    }
+  }, [isInitialized]) // 移除debouncedLoadContracts依赖项，避免循环
 
   /**
    * 处理搜索
    * @param values 搜索表单值
    */
   const handleSearch = (values: any) => {
+    console.log('=== 处理搜索 ===', values)
     const params = {
       ...values,
       contractName: values.contractName?.trim(),
@@ -114,17 +367,20 @@ const ContractList: React.FC = () => {
     
     // 重置分页并搜索
     setPagination(prev => ({ ...prev, current: 1 }))
-    loadContracts(params)
+    // 使用防抖机制，但搜索操作使用较短延迟
+    debouncedLoadContracts(params, 100)
   }
 
   /**
    * 重置搜索条件
    */
   const handleReset = () => {
+    console.log('=== 重置搜索条件 ===')
     form.resetFields()
     setSearchParams({})
     setPagination(prev => ({ ...prev, current: 1 }))
-    loadContracts()
+    // 使用防抖机制
+    debouncedLoadContracts({}, 100)
   }
 
   /**
@@ -133,6 +389,7 @@ const ContractList: React.FC = () => {
    * @param pageSize 每页大小
    */
   const handleTableChange = (page: number, pageSize: number) => {
+    console.log('=== 处理分页变化 ===', { page, pageSize })
     setPagination(prev => ({
       ...prev,
       current: page,
@@ -140,6 +397,7 @@ const ContractList: React.FC = () => {
     }))
     
     const searchValues = form.getFieldsValue()
+    // 分页变化立即执行，不使用防抖
     loadContracts({
       ...searchValues,
       page: page - 1,
@@ -153,8 +411,10 @@ const ContractList: React.FC = () => {
    */
   const handleDelete = async (id: number) => {
     try {
+      console.log('=== 删除合同 ===', id)
       await contractApi.deleteContract(id)
       message.success('删除成功')
+      // 删除后立即刷新，不使用防抖
       loadContracts(form.getFieldsValue())
     } catch (error) {
       console.error('删除合同失败:', error)
@@ -278,6 +538,19 @@ const ContractList: React.FC = () => {
     },
   ]
 
+  // 组件渲染调试信息
+  console.log('=== ContractList组件渲染 ===')
+  console.log('当前时间:', new Date().toLocaleTimeString())
+  console.log('路由路径:', location.pathname)
+  console.log('contracts状态:', {
+    length: contracts?.length,
+    isArray: Array.isArray(contracts),
+    data: contracts
+  })
+  console.log('pagination状态:', pagination)
+  console.log('loading状态:', loading)
+  console.log('=== 组件渲染调试结束 ===')
+
   return (
     <div>
       {/* 页面标题 */}
@@ -364,6 +637,14 @@ const ContractList: React.FC = () => {
 
       {/* 合同表格 */}
       <Card className="content-card">
+        {/* 渲染前调试信息 */}
+        {console.log('=== Table组件渲染调试 ===')}
+        {console.log('Table dataSource (contracts):', contracts)}
+        {console.log('contracts长度:', contracts?.length)}
+        {console.log('contracts是否为数组:', Array.isArray(contracts))}
+        {console.log('loading状态:', loading)}
+        {console.log('pagination状态:', pagination)}
+        
         <Table
           columns={columns}
           dataSource={contracts}
