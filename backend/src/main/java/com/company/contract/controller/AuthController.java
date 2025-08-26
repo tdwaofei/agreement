@@ -29,9 +29,6 @@ public class AuthController {
     @Autowired
     private JwtUtil jwtUtil;
 
-    @Autowired
-    private UserDetailsServiceImpl userDetailsService;
-
     /**
      * 用户登录接口
      * @param loginRequest 登录请求参数
